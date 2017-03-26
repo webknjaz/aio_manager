@@ -73,7 +73,26 @@ class CreateTables(SACommand):
 
         print(Fore.GREEN + 'Creating all tables' + Style.RESET_ALL)
         engine = await self.create_engine()
-        await self.declarative_base.metadata.create_all(engine)
+
+        from sqlalchemy.sql import ddl, schema
+        async def _async_run_visitor(self, visitorcallable, element,
+                         connection=None, **kwargs):
+            visitorcallable(self.dialect, self,
+                            **kwargs).traverse_single(element)
+
+        async def create_all(metadata, bind, tables=None, checkfirst=True):
+            await bind._async_run_visitor(
+                bind,
+                ddl.SchemaGenerator,
+                metadata,
+                checkfirst=checkfirst,
+                tables=tables
+            )
+
+        engine._async_run_visitor = _async_run_visitor
+        engine.schema_for_object = schema._schema_getter(None)
+        #await self.declarative_base.metadata.create_all(engine)
+        await create_all(metadata=self.declarative_base.metadata, bind=engine)
 
     def run(self, app, args):
         loop = asyncio.get_event_loop()
